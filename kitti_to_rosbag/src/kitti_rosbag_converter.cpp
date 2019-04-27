@@ -59,6 +59,7 @@ class KittiBagConverter {
 
   std::string pose_topic_;
   std::string transform_topic_;
+  std::string imu_topic_;
   std::string pointcloud_topic_;
 };
 
@@ -72,6 +73,7 @@ KittiBagConverter::KittiBagConverter(const std::string& calibration_path,
       velodyne_frame_id_("velodyne"),
       pose_topic_("pose_imu"),
       transform_topic_("transform_imu"),
+      imu_topic_("imu/data"),
       pointcloud_topic_("velodyne_points") {
   // Load all the timestamp maps and calibration parameters.
   parser_.loadCalibration();
@@ -113,6 +115,17 @@ bool KittiBagConverter::convertEntry(uint64_t entry) {
     convertTf(timestamp_ns, pose);
   } else {
     return false;
+  }
+
+  // Convert raw IMU
+  sensor_msgs::Imu imu_msg;
+  if (parser_.getImuAtEntry(entry, &timestamp_ns, &imu_msg)) {
+
+    timestampToRos(timestamp_ns, &timestamp_ros);
+    imu_msg.header.frame_id = imu_frame_id_;
+    imu_msg.header.stamp = timestamp_ros;
+
+    bag_.write(imu_topic_, timestamp_ros, imu_msg);
   }
 
   // Convert images.

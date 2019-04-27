@@ -435,6 +435,32 @@ bool KittiParser::getPoseAtEntry(uint64_t entry, uint64_t* timestamp,
   return false;
 }
 
+bool KittiParser::getImuAtEntry(uint64_t entry, uint64_t* timestamp,
+                                sensor_msgs::Imu* imu_msg) {
+  std::string filename = dataset_path_ + "/" + kPoseFolder + "/" + kDataFolder +
+                         "/" + getFilenameForEntry(entry) + ".txt";
+
+  std::ifstream import_file(filename, std::ios::in);
+  if (!import_file) {
+    return false;
+  }
+  if (timestamps_pose_ns_.size() <= entry) {
+    return false;
+  }
+  *timestamp = timestamps_pose_ns_[entry];
+
+  std::string line;
+  std::vector<double> parsed_doubles;
+  while (std::getline(import_file, line)) {
+    if (parseVectorOfDoubles(line, &parsed_doubles)) {
+      if (convertOxtxToImu(parsed_doubles, imu_msg)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 uint64_t KittiParser::getPoseTimestampAtEntry(uint64_t entry) {
   if (timestamps_pose_ns_.size() <= entry) {
     return 0;
@@ -546,6 +572,47 @@ bool KittiParser::convertGpsToPose(const std::vector<double>& oxts,
   }
   // Get back to local coordinates.
   *pose = T_initial_pose_.inverse() * transform;
+
+  return true;
+}
+
+bool KittiParser::convertOxtxToImu(const std::vector<double>& oxts,
+                                   sensor_msgs::Imu* imu_msg) {
+  if (oxts.size() < 23) {
+    return false;
+  }
+
+  double ax = oxts[11];
+  double ay = oxts[12];
+  double az = oxts[13];
+
+  double wx = oxts[17];
+  double wy = oxts[18];
+  double wz = oxts[19];
+
+  double roll = oxts[3];
+  double pitch = oxts[4];
+  double yaw = oxts[5];
+
+  // Rotation.
+  const Eigen::AngleAxisd axis_roll(roll, Eigen::Vector3d::UnitX());
+  const Eigen::AngleAxisd axis_pitch(pitch, Eigen::Vector3d::UnitY());
+  const Eigen::AngleAxisd axis_yaw(yaw, Eigen::Vector3d::UnitZ());
+
+  Eigen::Quaterniond rotation = axis_yaw * axis_pitch * axis_roll;
+
+  imu_msg->linear_acceleration.x = ax; 
+  imu_msg->linear_acceleration.y = ay; 
+  imu_msg->linear_acceleration.z = az; 
+
+  imu_msg->angular_velocity.x = wx;
+  imu_msg->angular_velocity.y = wy;
+  imu_msg->angular_velocity.z = wz;
+
+  imu_msg->orientation.w = rotation.w();
+  imu_msg->orientation.x = rotation.x();
+  imu_msg->orientation.y = rotation.y();
+  imu_msg->orientation.z = rotation.z();
 
   return true;
 }

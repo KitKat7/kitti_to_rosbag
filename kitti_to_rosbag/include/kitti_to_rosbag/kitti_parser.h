@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <opencv2/core/core.hpp>
 
 #include "kitti_to_rosbag/kitti_common.h"
+#include "sensor_msgs/Imu.h"
 
 namespace kitti {
 
@@ -71,9 +72,8 @@ class KittiParser {
   bool getGpsAtEntry() { /* TODO! */
     return false;
   }
-  bool getImuAtEntry() { /* TODO! */
-    return false;
-  }
+  bool getImuAtEntry(uint64_t entry, uint64_t* timestamp,
+                     sensor_msgs::Imu* imu_msg);
   bool getPointcloudAtEntry(uint64_t entry, uint64_t* timestamp,
                             pcl::PointCloud<pcl::PointXYZI>* ptcloud);
   bool getImageAtEntry(uint64_t entry, uint64_t cam_id, uint64_t* timestamp,
@@ -100,6 +100,7 @@ class KittiParser {
   bool loadImuToVelCalibration();
 
   bool convertGpsToPose(const std::vector<double>& oxts, Transformation* pose);
+  bool convertOxtxToImu(const std::vector<double>& oxts, sensor_msgs::Imu* imu_msg);
   double latToScale(double lat) const;
   void latlonToMercator(double lat, double lon, double scale,
                         Eigen::Vector2d* mercator) const;
